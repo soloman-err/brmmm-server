@@ -102,6 +102,13 @@ async function run() {
       res.send(result);
     });
 
+    app.delete('/carts/:id', async (req, res) => {
+      const id = req.params.id;
+      const query = { _id: new ObjectId(id) };
+      const result = await cartCollection.deleteOne(query);
+      res.send(result);
+    });
+
     // Get products---------------------------->>>>>>
     app.get('/products', async (req, res) => {
       const result = await productCollection.find().toArray();
