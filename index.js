@@ -5,6 +5,7 @@ require('dotenv').config();
 const port = process.env.PORT || 2000;
 const { MongoClient, ServerApiVersion, ObjectId } = require('mongodb');
 const jwt = require('jsonwebtoken');
+const stripe = require('stripe')(process.env.PAYMENT_SECRET_KEY);
 
 //middleware:
 app.use(cors());
@@ -49,6 +50,7 @@ async function run() {
     const userCollection = client.db('brmmm').collection('users');
     const productCollection = client.db('brmmm').collection('products');
     const cartCollection = client.db('brmmm').collection('carts');
+    const paymentCollection = client.db('brmmm').collection('payments');
 
     // JWT configuration----------------------->>>>>>
     app.post('/jwt', async (req, res) => {
@@ -88,7 +90,7 @@ async function run() {
       if (email !== decodedEmail) {
         return res
           .status(403)
-          .send({ error: true, message: 'Unauthorized Access!' });
+          .send({ error: true, message: 'Forbidden Access!' });
       }
 
       const query = { email: email };
@@ -107,6 +109,36 @@ async function run() {
       const query = { _id: new ObjectId(id) };
       const result = await cartCollection.deleteOne(query);
       res.send(result);
+    });
+
+    // Create payment intent:
+    app.post('/create-payment-intent', async (req, res) => {
+      const { price } = req.body;
+      const amount = price * 100;
+
+      const paymentIntent = await stripe.paymentIntents.create({
+        amount: amount,
+        currency: 'USD',
+        payment_method_types: ['card'],
+      });
+      res.send({
+        clientSecret: paymentIntent.client_secret,
+      });
+    });
+
+    // Payment APIs--------------------------->>>>>>
+    app.post('/payments', verifyJWT, async (req, res) => {
+      const payment = req.body;
+      const insertResult = await paymentCollection.insertOne(payment);
+
+      const query = {
+        _id: {
+          $in: payment.cartProducts.map((id) => new ObjectId(id)),
+        },
+      };
+      const deletedResult = await cartCollection.deleteMany(query);
+
+      res.send({insertResult, deletedResult});
     });
 
     // Get products---------------------------->>>>>>
