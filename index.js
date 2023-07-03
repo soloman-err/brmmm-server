@@ -61,6 +61,19 @@ async function run() {
       res.send(token);
     });
 
+    // Verify-Admin----------------------------->>>>>>
+    const verifyAdmin = async (req, res, next) => {
+      const email = req.decoded?.email;
+      const query = { email: email };
+      const user = await userCollection.findOne(query);
+      if (user?.role !== 'admin') {
+        return res
+          .status(403)
+          .send({ error: true, message: 'Forbidden Access!' });
+      }
+      next();
+    };
+
     // User based APIs:
     app.get('/users', async (req, res) => {
       const result = await userCollection.find().toArray();
@@ -76,6 +89,19 @@ async function run() {
         return res.send({ message: 'User already exists!' });
       }
       const result = await userCollection.insertOne(user);
+      res.send(result);
+    });
+
+    // Admin APIs---------------------------------->>>>>>
+    app.get('/users/admin/:email', verifyJWT, async (req, res) => {
+      const email = req.params.email;
+      if (req.decoded?.email !== email) {
+        res.send({ admin: false });
+      }
+
+      const query = { email: email };
+      const user = await userCollection.findOne(query);
+      const result = { admin: user?.role === 'admin' };
       res.send(result);
     });
 
@@ -111,6 +137,11 @@ async function run() {
       res.send(result);
     });
 
+    app.delete('/carts', async (req, res) => {
+      const result = await cartCollection.deleteMany();
+      res.send(result);
+    });
+
     // Create payment intent:
     app.post('/create-payment-intent', async (req, res) => {
       const { price } = req.body;
@@ -138,10 +169,10 @@ async function run() {
       };
       const deletedResult = await cartCollection.deleteMany(query);
 
-      res.send({insertResult, deletedResult});
+      res.send({ insertResult, deletedResult });
     });
 
-    // Get products---------------------------->>>>>>
+    // Products APIs---------------------------->>>>>>
     app.get('/products', async (req, res) => {
       const result = await productCollection.find().toArray();
       res.send(result);
@@ -151,6 +182,19 @@ async function run() {
       const id = req.params.id;
       const query = { _id: new ObjectId(id) };
       const result = await productCollection.findOne(query);
+      res.send(result);
+    });
+
+    app.post('/addProduct', async (req, res) => {
+      const addedProduct = req.body;
+      const result = await productCollection.insertOne(addedProduct);
+      res.send(result);
+    });
+
+    app.delete('/products/:id', async (req, res) => {
+      const id = req.params.id;
+      const query = { _id: new ObjectId(id) };
+      const result = await productCollection.deleteOne(query);
       res.send(result);
     });
 
